@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Estimated Tax Payment Calculator</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 24px 20px 8px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  .subtitle { color: var(--muted); margin: 0; font-size: 0.9rem; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px 20px 60px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 1.05rem; color: var(--accent); }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+  }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  input[type="number"], select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.95rem;
+  }
+  input[type="number"]:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .checks { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 14px; }
+  .check { display: flex; align-items: center; gap: 8px; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .check label { margin: 0; color: var(--text); font-size: 0.9rem; }
+
+  .quarter {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 720px) { .quarter { grid-template-columns: 1fr; } }
+  .quarter .inputs { display: flex; flex-direction: column; gap: 12px; }
+  .quarter-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .quarter-head .due-date { color: var(--muted); font-size: 0.78rem; }
+
+  .results {
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    align-self: start;
+  }
+  .result-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 0.9rem; }
+  .result-row.strong { font-weight: 600; }
+  .result-row .lbl { color: var(--muted); }
+  .result-row .val { font-variant-numeric: tabular-nums; }
+  .val.due { font-weight: 700; }
+  .val.pos { color: var(--warn); }
+  .val.credit { color: var(--good); }
+  .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 10px 0 2px; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  .stat { background: var(--panel-2); border-radius: 10px; padding: 12px 14px; }
+  .stat .k { font-size: 0.75rem; color: var(--muted); }
+  .stat .v { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  .hint { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Estimated Tax Payment Calculator</h1>
+  <p class="subtitle">Quarterly, cumulative estimated federal &amp; state payments for self-employment income, including self-employment tax.</p>
+</header>
+
+<main>
+  <div class="toolbar">
+    <button id="resetBtn" type="button">Reset all</button>
+    <span class="hint" style="margin:0">Data is saved automatically in this browser.</span>
+  </div>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <div class="settings-grid">
+      <div>
+        <label for="fedRate">Federal income-tax rate (%)</label>
+        <input type="number" id="fedRate" min="0" max="100" step="0.1" />
+      </div>
+      <div>
+        <label for="stateRate">State income-tax rate (%)</label>
+        <input type="number" id="stateRate" min="0" max="100" step="0.1" />
+      </div>
+      <div class="empr-cell">
+        <label for="soloLimit">Solo 401(k) total limit ($/yr)</label>
+        <input type="number" id="soloLimit" min="0" step="500" />
+      </div>
+    </div>
+    <div class="checks">
+      <div class="check">
+        <input type="checkbox" id="useEmployee" />
+        <label for="useEmployee">Include employee Solo 401(k) contributions</label>
+      </div>
+      <div class="check">
+        <input type="checkbox" id="useEmployer" />
+        <label for="useEmployer">Include employer Solo 401(k) contributions</label>
+      </div>
+    </div>
+    <p class="hint" id="seNote"></p>
+  </section>
+
+  <div id="quarters"></div>
+
+  <section class="card">
+    <h2>Year summary</h2>
+    <div class="summary-grid" id="summary"></div>
+  </section>
+
+  <p class="hint">
+    Self-employment tax is a flat 15.3% (12.4% Social Security + 2.9% Medicare) on 92.35% of cumulative net profit,
+    with no wage-base cap &mdash; so it slightly overpays past the Social Security maximum. Half of the SE tax is
+    deducted before applying your federal income-tax rate. 401(k) contributions reduce income tax only, not SE tax.
+    State tax uses the same taxable base and does not add SE tax. This is a simplified estimator &mdash; it does not
+    model tax brackets, deductions, the Social Security cap, or additional Medicare tax. Consult a tax professional
+    for filing decisions.
+  </p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "estTaxCalc.v3";
+
+  var QUARTERS = [
+    { name: "Q1", period: "Jan 1 – Mar 31", due: "Payment due ~Apr 15" },
+    { name: "Q2", period: "Apr 1 – May 31", due: "Payment due ~Jun 15" },
+    { name: "Q3", period: "Jun 1 – Aug 31", due: "Payment due ~Sep 15" },
+    { name: "Q4", period: "Sep 1 – Dec 31", due: "Payment due ~Jan 15" }
+  ];
+
+  var FIELDS = ["income", "emp401k", "empr401k", "irsPaid", "statePaid"];
+
+  // Self-employment tax constants (flat 15.3% on 92.35% of net profit, uncapped)
+  var SE_FACTOR = 0.9235;
+  var SS_RATE = 0.124;
+  var MEDICARE_RATE = 0.029;
+
+  // Effective employer (profit-sharing) rate for a self-employed person:
+  // the 25% plan rate becomes 0.25/(1+0.25) = 20% of net earnings (Pub 560).
+  var EMPLOYER_RATE = 0.20;
+
+  function defaultState() {
+    return {
+      fedRate: 22,
+      stateRate: 5,
+      soloLimit: 72000,   // 2026 §415(c) overall Solo 401(k) limit — update for your tax year
+      useEmployee: false,
+      useEmployer: false,
+      quarters: QUARTERS.map(function () {
+        return { income: 0, emp401k: 0, empr401k: 0, irsPaid: 0, statePaid: 0 };
+      })
+    };
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      var base = defaultState();
+      base.fedRate = num(parsed.fedRate, base.fedRate);
+      base.stateRate = num(parsed.stateRate, base.stateRate);
+      base.soloLimit = num(parsed.soloLimit, base.soloLimit);
+      base.useEmployee = !!parsed.useEmployee;
+      base.useEmployer = !!parsed.useEmployer;
+      if (Array.isArray(parsed.quarters)) {
+        parsed.quarters.forEach(function (q, i) {
+          if (i < 4 && q) {
+            FIELDS.forEach(function (f) { base.quarters[i][f] = num(q[f], 0); });
+          }
+        });
+      }
+      return base;
+    } catch (e) {
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function num(v, fallback) {
+    var n = parseFloat(v);
+    return isFinite(n) ? n : (fallback || 0);
+  }
+
+  function money(n) {
+    var sign = n < 0 ? "-" : "";
+    return sign + "$" + Math.abs(n).toLocaleString("en-US", {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+
+  // Whole-dollar formatting for the amounts you actually pay.
+  function money0(n) {
+    var sign = n < 0 ? "-" : "";
+    return sign + "$" + Math.round(Math.abs(n)).toLocaleString("en-US", {
+      maximumFractionDigits: 0
+    });
+  }
+
+  var state = loadState();
+
+  // ---- Rendering -----------------------------------------------------------
+
+  function buildQuarters() {
+    var container = document.getElementById("quarters");
+    container.innerHTML = "";
+    QUARTERS.forEach(function (meta, i) {
+      var card = document.createElement("section");
+      card.className = "card";
+      card.innerHTML =
+        '<div class="quarter-head">' +
+          '<h2>' + meta.name + ' &middot; <span style="color:var(--muted);font-weight:400">' + meta.period + '</span></h2>' +
+          '<span class="due-date">' + meta.due + '</span>' +
+        '</div>' +
+        '<div class="quarter">' +
+          '<div>' +
+            '<div class="section-label">This quarter</div>' +
+            '<div class="inputs">' +
+              field(i, "income", "Net SE profit") +
+              field(i, "emp401k", "Employee 401(k)", "emp-cell") +
+              field(i, "empr401k", "Employer 401(k)", "empr-cell") +
+              field(i, "irsPaid", "IRS payment made") +
+              field(i, "statePaid", "State payment made") +
+            '</div>' +
+          '</div>' +
+          '<div class="results" id="results-' + i + '"></div>' +
+        '</div>';
+      container.appendChild(card);
+    });
+
+    QUARTERS.forEach(function (meta, i) {
+      FIELDS.forEach(function (f) {
+        var el = document.getElementById(f + "-" + i);
+        el.addEventListener("input", function () {
+          state.quarters[i][f] = num(el.value, 0);
+          recalc();
+          saveState();
+        });
+      });
+    });
+  }
+
+  function field(i, key, labelText, extraClass) {
+    var cls = extraClass ? ' class="' + extraClass + '"' : "";
+    return '<div' + cls + '>' +
+      '<label for="' + key + '-' + i + '">' + labelText + '</label>' +
+      '<input type="number" step="0.01" id="' + key + '-' + i + '" />' +
+    '</div>';
+  }
+
+  function syncInputsFromState() {
+    document.getElementById("fedRate").value = state.fedRate;
+    document.getElementById("stateRate").value = state.stateRate;
+    document.getElementById("soloLimit").value = state.soloLimit;
+    document.getElementById("useEmployee").checked = state.useEmployee;
+    document.getElementById("useEmployer").checked = state.useEmployer;
+    state.quarters.forEach(function (q, i) {
+      FIELDS.forEach(function (f) {
+        document.getElementById(f + "-" + i).value = q[f];
+      });
+    });
+  }
+
+  function applyToggles() {
+    document.querySelectorAll(".emp-cell").forEach(function (el) {
+      el.classList.toggle("hidden", !state.useEmployee);
+    });
+    document.querySelectorAll(".empr-cell").forEach(function (el) {
+      el.classList.toggle("hidden", !state.useEmployer);
+    });
+    document.getElementById("seNote").textContent =
+      "Self-employment tax is a flat 15.3% (12.4% Social Security + 2.9% Medicare) on " +
+      "92.35% of net profit, with no wage-base cap. Half of it is deducted before income tax.";
+  }
+
+  // ---- Calculation ---------------------------------------------------------
+
+  // Self-employment tax on a cumulative net-profit amount, following the
+  // 2026 Form 1040-ES "Self-Employment Tax and Deduction Worksheet".
+  function seTaxFor(netProfit) {
+    if (netProfit <= 0) return { core: 0, ss: 0, medicare: 0, addl: 0, half: 0, base: 0 };
+    var base = netProfit * SE_FACTOR;                       // line 3
+    var medicare = base * MEDICARE_RATE;                    // line 4 (2.9%)
+    // No Social Security wage-base cap: 12.4% is applied to the full SE base.
+    // This intentionally overpays past the annual SS maximum rather than risk
+    // underpaying, and ignores any W-2 wages that would have used up the cap.
+    var ss = base * SS_RATE;                                // 12.4%, uncapped
+    var core = medicare + ss;                               // SE tax = 15.3% of base
+    var half = core * 0.5;                                  // ½ deduction
+
+    return { core: core, ss: ss, medicare: medicare, addl: 0, half: half, base: base };
+  }
+
+  function recalc() {
+    var fedRate = state.fedRate / 100;
+    var stateRate = state.stateRate / 100;
+
+    var cumIncome = 0, cumEmp = 0, cumEmpr = 0;
+    var priorIrs = 0, priorState = 0;
+    var last = null;
+
+    state.quarters.forEach(function (q, i) {
+      cumIncome += q.income;
+      if (state.useEmployee) cumEmp += q.emp401k;
+      if (state.useEmployer) cumEmpr += q.empr401k;
+
+      var contrib = cumEmp + cumEmpr;
+      var se = seTaxFor(cumIncome);
+
+      // Max allowed employer (profit-sharing) contribution, cumulative:
+      // 20% of net earnings (net profit − ½ SE tax), capped by the overall
+      // §415(c) limit less any employee elective deferrals.
+      var netEarnings = Math.max(0, cumIncome - se.half);
+      var employeeDeferrals = state.useEmployee ? cumEmp : 0;
+      var maxEmployer = Math.max(0, Math.min(
+        EMPLOYER_RATE * netEarnings,
+        state.soloLimit - employeeDeferrals
+      ));
+
+      // Income-tax base: net profit, less half of SE tax, less 401(k) contributions.
+      // Other income (W-2 wages) is excluded — it is taxed via paycheck withholding,
+      // and here only feeds the SS wage-base and additional-Medicare caps.
+      var taxable = Math.max(0, cumIncome - se.half - contrib);
+
+      var fedIncomeTax = taxable * fedRate;
+      var fedOwed = fedIncomeTax + se.core + se.addl;  // income tax + SE tax + add'l Medicare
+      var stateOwed = taxable * stateRate;             // state: income tax only, no SE tax
+
+      var fedDue = fedOwed - priorIrs;
+      var stateDue = stateOwed - priorState;
+
+      renderResults(i, {
+        cumIncome: cumIncome,
+        contrib: contrib,
+        cumEmpr: cumEmpr,
+        maxEmployer: maxEmployer,
+        seTax: se.core,
+        addlMedicare: se.addl,
+        halfSe: se.half,
+        taxable: taxable,
+        fedIncomeTax: fedIncomeTax,
+        fedOwed: fedOwed,
+        stateOwed: stateOwed,
+        priorIrs: priorIrs,
+        priorState: priorState,
+        fedDue: fedDue,
+        stateDue: stateDue
+      });
+
+      priorIrs += q.irsPaid;
+      priorState += q.statePaid;
+
+      last = { taxable: taxable, seTax: se.core, addlMedicare: se.addl,
+               fedIncomeTax: fedIncomeTax, fedOwed: fedOwed, stateOwed: stateOwed,
+               contrib: contrib, cumEmpr: cumEmpr, maxEmployer: maxEmployer };
+    });
+
+    renderSummary({
+      cumIncome: cumIncome,
+      totalContrib: last.contrib,
+      totalTaxable: last.taxable,
+      totalSeTax: last.seTax,
+      totalAddlMedicare: last.addlMedicare,
+      totalFedIncomeTax: last.fedIncomeTax,
+      totalFedOwed: last.fedOwed,
+      totalStateOwed: last.stateOwed,
+      totalIrsPaid: priorIrs,
+      totalStatePaid: priorState,
+      maxEmployer: last.maxEmployer,
+      totalEmployer: last.cumEmpr
+    });
+  }
+
+  function dueRow(label, value) {
+    var cls = value > 0.5 ? "pos" : (value < -0.5 ? "credit" : "");
+    var display = value < -0.5 ? money0(Math.abs(value)) + " overpaid" : money0(value);
+    return '<div class="result-row"><span class="lbl">' + label + '</span>' +
+      '<span class="val due ' + cls + '">' + display + '</span></div>';
+  }
+
+  function row(label, value, strong) {
+    return '<div class="result-row' + (strong ? ' strong' : '') + '">' +
+      '<span class="lbl">' + label + '</span>' +
+      '<span class="val">' + money(value) + '</span></div>';
+  }
+
+  // Cumulative max allowed employer contribution; flags an over-contribution.
+  function employerRow(r) {
+    var over = r.cumEmpr > r.maxEmployer + 0.5;
+    var cls = over ? "pos" : "";
+    var note = over ? " — over limit" : "";
+    return '<div class="section-label">Employer 401(k)</div>' +
+      '<div class="result-row"><span class="lbl">Max allowed (cumulative)</span>' +
+      '<span class="val ' + cls + '">' + money(r.maxEmployer) + '</span></div>' +
+      '<div class="result-row"><span class="lbl">Contributed so far</span>' +
+      '<span class="val ' + cls + '">' + money(r.cumEmpr) + note + '</span></div>';
+  }
+
+  function renderResults(i, r) {
+    var el = document.getElementById("results-" + i);
+    var contribLine = (state.useEmployee || state.useEmployer)
+      ? row("Less 401(k) contributions", -r.contrib) : "";
+    el.innerHTML =
+      '<div class="section-label" style="margin-top:0">Cumulative through ' + QUARTERS[i].name + '</div>' +
+      row("Net SE profit", r.cumIncome) +
+      row("Self-employment tax", r.seTax) +
+      row("Less ½ SE-tax deduction", -r.halfSe) +
+      contribLine +
+      row("Taxable income", r.taxable, true) +
+      (state.useEmployer ? employerRow(r) : "") +
+      '<div class="section-label">Federal (income tax + SE tax)</div>' +
+      row("Income tax", r.fedIncomeTax) +
+      row("Self-employment tax", r.seTax) +
+      (r.addlMedicare > 0.004 ? row("Additional Medicare tax", r.addlMedicare) : "") +
+      row("Total owed (cumulative)", r.fedOwed, true) +
+      row("Paid in prior quarters", r.priorIrs) +
+      dueRow("Recommended payment", r.fedDue) +
+      '<div class="section-label">State</div>' +
+      row("Tax owed (cumulative)", r.stateOwed) +
+      row("Paid in prior quarters", r.priorState) +
+      dueRow("Recommended payment", r.stateDue);
+  }
+
+  function renderSummary(s) {
+    var el = document.getElementById("summary");
+    var fedRemaining = s.totalFedOwed - s.totalIrsPaid;
+    var stateRemaining = s.totalStateOwed - s.totalStatePaid;
+    function stat(k, v, cls) {
+      return '<div class="stat"><div class="k">' + k + '</div><div class="v ' + (cls || "") + '">' + v + '</div></div>';
+    }
+    function remCls(v) { return v > 0.5 ? "pos" : (v < -0.5 ? "credit" : ""); }
+    function remVal(v) { return v < -0.5 ? money0(Math.abs(v)) + " overpaid" : money0(v); }
+
+    var employerStat = state.useEmployer
+      ? stat("Max employer 401(k)", money(s.maxEmployer),
+             s.totalEmployer > s.maxEmployer + 0.5 ? "pos" : "")
+      : "";
+    el.innerHTML =
+      stat("Total net SE profit", money(s.cumIncome)) +
+      stat("Total 401(k)", money(s.totalContrib)) +
+      employerStat +
+      stat("Total taxable", money(s.totalTaxable)) +
+      stat("Self-employment tax", money(s.totalSeTax)) +
+      (s.totalAddlMedicare > 0.004 ? stat("Additional Medicare", money(s.totalAddlMedicare)) : "") +
+      stat("Federal income tax", money(s.totalFedIncomeTax)) +
+      stat("Federal owed (total)", money(s.totalFedOwed)) +
+      stat("Federal paid", money(s.totalIrsPaid)) +
+      stat("Federal remaining", remVal(fedRemaining), remCls(fedRemaining)) +
+      stat("State owed", money(s.totalStateOwed)) +
+      stat("State paid", money(s.totalStatePaid)) +
+      stat("State remaining", remVal(stateRemaining), remCls(stateRemaining));
+  }
+
+  // ---- Wiring --------------------------------------------------------------
+
+  buildQuarters();
+  syncInputsFromState();
+
+  document.getElementById("fedRate").addEventListener("input", function () {
+    state.fedRate = num(this.value, 0); recalc(); saveState();
+  });
+  document.getElementById("stateRate").addEventListener("input", function () {
+    state.stateRate = num(this.value, 0); recalc(); saveState();
+  });
+  document.getElementById("soloLimit").addEventListener("input", function () {
+    state.soloLimit = num(this.value, 0); recalc(); saveState();
+  });
+  document.getElementById("useEmployee").addEventListener("change", function () {
+    state.useEmployee = this.checked; applyToggles(); recalc(); saveState();
+  });
+  document.getElementById("useEmployer").addEventListener("change", function () {
+    state.useEmployer = this.checked; applyToggles(); recalc(); saveState();
+  });
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    if (!confirm("Clear all entries and reset to defaults?")) return;
+    state = defaultState();
+    syncInputsFromState();
+    applyToggles();
+    recalc();
+    saveState();
+  });
+
+  applyToggles();
+  recalc();
+})();
+</script>
+</body>
+</html>
