@@ -1,8 +1,10 @@
 # Estimated Tax Payment Calculator
 
+**🔗 Live app: https://alextarra.github.io/EstimatedTaxCalculator/**
+
 A small, single-file web app for estimating quarterly federal and state tax
 payments for self-employment income. No build step, no server, no dependencies
-— just open `index.html` in any browser.
+— just open the live link above, or `index.html` in any browser.
 
 ## What it does
 
